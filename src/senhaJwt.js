@@ -1,0 +1,1 @@
+module.exports = 'SenhaMuitoSegura123456789'
