@@ -1,16 +1,11 @@
 const pool = require("../database/connection")
+const {  parseISO, isValid } = require("date-fns")
+
 
 const listarTransacoes = async (req, res) => {
     const { id } = req.usuario;
-    const { filtro } = req.query;
     try {
-        const { rows } = await pool.query('select * from transacoes t inner join categorias c on t.categoria_id = c.id where usuario_id = $1 order by c.descricao ', [id])
-        if (filtro) {
-            const filtragem = rows.filter((transacao) => {
-                return filtro.includes(transacao.descricao)
-            })
-            return res.status(200).json(filtragem);
-        }
+        const { rows } = await pool.query('select * from transacoes where usuario_id = $1', [id])
         return res.status(200).json(rows);
     } catch (error) {
         res.status(500).json({ mensagem: `${error}` })
@@ -20,17 +15,23 @@ const listarTransacoes = async (req, res) => {
 const cadastrarTransacao = async (req, res) => {
     const { tipo, descricao, valor, data, categoria_id } = req.body;
     const { id } = req.usuario;
+
     try {
+        const dataValida = parseISO(data)
+        if (!isValid(dataValida)) {
+            return res.status(400).json({ mensagem: "A data informada não é válida" });
+        }
         const { rows, rowCount } = await pool.query('select * from categorias where id =$1', [categoria_id])
         if (rowCount < 1) {
             return res.status(404).json({ mensagem: "A categoria informada não existe." })
         }
-        const transacao = await pool.query('insert into transacoes(tipo, descricao, valor, data, usuario_id, categoria_id) values ($1, $2, $3, $4, $5, $6) returning *', [tipo, descricao, valor, data, id, categoria_id])
+        const transacao = await pool.query('insert into transacoes(tipo, descricao, valor, data, usuario_id, categoria_id) values ($1, $2, $3, $4, $5, $6) returning *', [tipo, descricao, valor, dataValida, id, categoria_id])
         const resultado = {
             ...transacao.rows[0],
             categoria_nome: rows[0].descricao
         }
         return res.status(201).json(resultado)
+
     } catch (error) {
         return res.status(500).json({ mensagem: `${error}` });
     }
